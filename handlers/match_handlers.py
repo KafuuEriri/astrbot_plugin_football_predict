@@ -14,8 +14,11 @@ class MatchHandlers:
     async def handle_matches(self, event):
         try:
             params = self._params(event)
-            page = self._page(params[0]) if params else 1
-            matches = self.lottery_service.get_cached_matches(world_cup_only=True, open_only=True)
+            show_all = bool(params and params[0] == "全部")
+            page_index = 1 if show_all else 0
+            page = self._page(params[page_index]) if len(params) > page_index else 1
+            max_days = None if show_all else self.lottery_service._config_int("public_match_days", 2)
+            matches = self.lottery_service.get_cached_matches(world_cup_only=True, open_only=True, max_days_ahead=max_days)
             yield event.plain_result(Formatters.match_list(matches, page=page))
         except Exception as exc:
             yield event.plain_result(f"查询赛事失败：{exc}")

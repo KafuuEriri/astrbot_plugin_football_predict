@@ -67,6 +67,25 @@ class LotteryDataServiceTest(TempStorageMixin, unittest.IsolatedAsyncioTestCase)
         self.assertEqual(cached.away_score, "1")
         self.assertEqual(cached.result, "H")
 
+    async def test_get_cached_matches_filters_max_days_ahead(self):
+        from tests.helpers import sample_match
+
+        near = sample_match(match_id="lottery_3", match_num="周五003", kickoff_offset=3600)
+        far = sample_match(match_id="lottery_4", match_num="周一004", kickoff_offset=3 * 86400)
+        self.storage.write_matches([near, far])
+        service = LotteryDataService(self.storage, {}, spider=object())
+        matches = service.get_cached_matches(world_cup_only=True, open_only=True, max_days_ahead=2)
+        self.assertEqual([match.match_num for match in matches], ["周五003"])
+
+    async def test_find_open_matches_by_team_matches_home_and_away(self):
+        from tests.helpers import sample_match
+
+        match = sample_match(match_id="lottery_5", match_num="周五005", home_team="阿根廷", away_team="法国")
+        self.storage.write_matches([match])
+        service = LotteryDataService(self.storage, {}, spider=object())
+        self.assertEqual(service.find_open_matches_by_team("阿根廷")[0].match_num, "周五005")
+        self.assertEqual(service.find_open_matches_by_team("法国")[0].match_num, "周五005")
+
 
 if __name__ == "__main__":
     unittest.main()

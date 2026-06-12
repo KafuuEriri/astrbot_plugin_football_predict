@@ -19,6 +19,31 @@
     "type": "int",
     "default": 2
   },
+  "public_match_days": {
+    "description": "普通赛事列表默认展示未来多少天的可投注赛事",
+    "type": "int",
+    "default": 2
+  },
+  "enable_natural_bet_regex": {
+    "description": "是否启用自然语言投注的本地规则解析",
+    "type": "bool",
+    "default": true
+  },
+  "enable_ai_bet_parser": {
+    "description": "是否在规则解析失败时调用当前会话模型解析投注意图",
+    "type": "bool",
+    "default": true
+  },
+  "natural_bet_min_confidence": {
+    "description": "模型投注意图解析的最低置信度",
+    "type": "float",
+    "default": 0.7
+  },
+  "natural_bet_llm_max_matches": {
+    "description": "发送给模型用于意图解析的最大候选赛事数量",
+    "type": "int",
+    "default": 10
+  },
   "daily_checkin_amount": {
     "description": "每日签到获得的虚拟金额",
     "type": "int",

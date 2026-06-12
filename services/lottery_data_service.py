@@ -104,14 +104,58 @@ class LotteryDataService:
             is_world_cup=self.is_world_cup(league_name),
         )
 
-    def get_cached_matches(self, world_cup_only: bool = False, open_only: bool = False, timestamp: Optional[int] = None) -> List[LotteryMatch]:
+    def get_cached_matches(
+        self,
+        world_cup_only: bool = False,
+        open_only: bool = False,
+        timestamp: Optional[int] = None,
+        max_days_ahead: Optional[int] = None,
+    ) -> List[LotteryMatch]:
         matches = self.storage.get_matches()
         if world_cup_only:
             matches = [match for match in matches if match.is_world_cup]
-        if open_only:
+        if open_only or max_days_ahead is not None:
             timestamp = timestamp or now_ts()
+        if open_only:
             matches = [match for match in matches if match.is_open_for_betting(timestamp)]
+        if max_days_ahead is not None:
+            end_ts = timestamp + max(0, int(max_days_ahead)) * 86400
+            matches = [match for match in matches if match.kickoff_ts and timestamp <= match.kickoff_ts <= end_ts]
         return sorted(matches, key=lambda match: (match.kickoff_ts, match.match_num, match.match_id))
+
+    def get_natural_bet_candidates(
+        self,
+        days: Optional[int] = None,
+        max_count: Optional[int] = None,
+        timestamp: Optional[int] = None,
+    ) -> List[LotteryMatch]:
+        days = self._config_int("public_match_days", 2) if days is None else days
+        matches = self.get_cached_matches(world_cup_only=True, open_only=True, timestamp=timestamp, max_days_ahead=days)
+        return matches[:max_count] if max_count else matches
+
+    def find_open_matches_by_team(
+        self,
+        team_text: str,
+        days: Optional[int] = None,
+        timestamp: Optional[int] = None,
+    ) -> List[LotteryMatch]:
+        needle = self._normalize_team_text(team_text)
+        if not needle:
+            return []
+        return [
+            match for match in self.get_natural_bet_candidates(days=days, timestamp=timestamp)
+            if needle in self._normalize_team_text(match.home_team) or needle in self._normalize_team_text(match.away_team)
+        ]
+
+    def team_side(self, match: LotteryMatch, team_text: str) -> str:
+        needle = self._normalize_team_text(team_text)
+        if not needle:
+            return ""
+        if needle in self._normalize_team_text(match.home_team):
+            return "home"
+        if needle in self._normalize_team_text(match.away_team):
+            return "away"
+        return ""
 
     def find_match(self, key: str) -> Optional[LotteryMatch]:
         return self.storage.find_match(key)
@@ -121,6 +165,9 @@ class LotteryDataService:
         if not keywords:
             return True
         return any(keyword.lower() in league_name.lower() for keyword in keywords)
+
+    def _normalize_team_text(self, value: str) -> str:
+        return "".join(str(value).lower().split())
 
     def _config_int(self, key: str, default: int) -> int:
         try:

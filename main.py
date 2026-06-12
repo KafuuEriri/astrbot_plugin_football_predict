@@ -13,6 +13,7 @@ try:
     from .handlers.user_handlers import UserHandlers
     from .services.betting_engine import BettingEngine
     from .services.lottery_data_service import LotteryDataService
+    from .services.natural_bet_intent import NaturalBetIntentParser
     from .services.settlement_service import SettlementService
     from .utils.storage import DataStorage
 except ImportError:
@@ -22,6 +23,7 @@ except ImportError:
     from handlers.user_handlers import UserHandlers
     from services.betting_engine import BettingEngine
     from services.lottery_data_service import LotteryDataService
+    from services.natural_bet_intent import NaturalBetIntentParser
     from services.settlement_service import SettlementService
     from utils.storage import DataStorage
 
@@ -29,6 +31,7 @@ except ImportError:
 class FootballPredictPlugin(Star):
     def __init__(self, context: Context, config: dict = None):
         super().__init__(context, config)
+        self.context = context
         self.plugin_config = config or {}
         self._tasks = []
         self._initialize_services()
@@ -39,11 +42,12 @@ class FootballPredictPlugin(Star):
         self.lottery_service = LotteryDataService(self.storage, self.plugin_config, logger=logger)
         self.betting_engine = BettingEngine(self.storage, self.plugin_config)
         self.settlement_service = SettlementService(self.storage, self.plugin_config)
+        self.natural_bet_parser = NaturalBetIntentParser(self.context, self.lottery_service, self.plugin_config, logger=logger)
 
     def _initialize_handlers(self):
         self.user_handlers = UserHandlers(self.betting_engine)
         self.match_handlers = MatchHandlers(self.lottery_service)
-        self.bet_handlers = BetHandlers(self.lottery_service, self.betting_engine)
+        self.bet_handlers = BetHandlers(self.lottery_service, self.betting_engine, self.natural_bet_parser)
         self.admin_handlers = AdminHandlers(self.storage, self.lottery_service, self.settlement_service)
 
     async def initialize(self):
@@ -117,6 +121,11 @@ class FootballPredictPlugin(Star):
         async for result in self.user_handlers.handle_checkin(event):
             yield result
 
+    @filter.command("签到")
+    async def simple_checkin(self, event: AstrMessageEvent):
+        async for result in self.user_handlers.handle_checkin(event):
+            yield result
+
     @filter.command("足球账户")
     async def football_account(self, event: AstrMessageEvent):
         async for result in self.user_handlers.handle_account(event):
@@ -135,6 +144,11 @@ class FootballPredictPlugin(Star):
     @filter.command("足球投注")
     async def football_bet(self, event: AstrMessageEvent):
         async for result in self.bet_handlers.handle_place_bet(event):
+            yield result
+
+    @filter.command("买球")
+    async def simple_bet(self, event: AstrMessageEvent):
+        async for result in self.bet_handlers.handle_simple_bet(event):
             yield result
 
     @filter.command("足球撤单")

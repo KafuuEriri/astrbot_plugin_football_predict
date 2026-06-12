@@ -20,11 +20,12 @@ class Formatters:
             "📌 普通命令\n"
             "| 命令 | 用途 |\n"
             "| --- | --- |\n"
-            "| /足球签到 | 每日领取20000虚拟币 |\n"
+            "| /签到 | 每日领取20000虚拟币 |\n"
             "| /足球账户 | 查看余额和投注统计 |\n"
-            "| /世界杯赛事 [页码] | 查看缓存赛事 |\n"
+            "| /世界杯赛事 [页码/全部] | 查看缓存赛事 |\n"
             "| /足球赔率 <场次> | 查看单场赔率 |\n"
-            "| /足球投注 <场次> <主胜/平/客胜> <金额> | 模拟下注 |\n"
+            "| /买球 阿根廷赢1000 | 简单自然语言下注 |\n"
+            "| /足球投注 <场次> <主胜/平/客胜> <金额> | 精确下注 |\n"
             "| /足球撤单 <投注单号> | 停售前撤单 |\n"
             "| /我的投注 [未结/已结/页码] | 查看投注记录 |\n"
             "| /足球排行 | 当前群排行 |\n\n"
@@ -78,7 +79,8 @@ class Formatters:
                 f"   🎯 {pool}",
                 f"   📊 主胜 {money_text(match.odds_h)} | 平 {money_text(match.odds_d)} | 客胜 {money_text(match.odds_a)}",
             ])
-        lines.append("💡 下注：/足球投注 场次 主胜 1000")
+        lines.append("💡 简单下注：/买球 阿根廷赢1000")
+        lines.append("💡 精确下注：/足球投注 场次 主胜 1000")
         return "\n".join(lines)
 
     @staticmethod
@@ -159,6 +161,34 @@ class Formatters:
             f"🏆 赢：{summary.get('won', 0)}｜❌ 输：{summary.get('lost', 0)}｜↩️ 无效：{summary.get('void', 0)}\n"
             f"⏳ 跳过：{summary.get('skipped', 0)} 单"
         )
+
+    @staticmethod
+    def natural_bet_usage() -> str:
+        return (
+            "💡 简单投注示例\n"
+            "━━━━━━━━━━━━\n"
+            "| 写法 | 示例 |\n"
+            "| --- | --- |\n"
+            "| 简单下注 | /买球 阿根廷赢1000 |\n"
+            "| 带足球命令 | /足球投注 阿根廷赢1000 |\n"
+            "| 精确下注 | /足球投注 周五003 主胜 1000 |"
+        )
+
+    @staticmethod
+    def natural_bet_no_match(team_text: str) -> str:
+        target = team_text or "该球队/场次"
+        return (
+            f"📭 未找到可投注赛事：{target}\n"
+            "请先用 /世界杯赛事 查看未来两天赛事，或用 /世界杯赛事 全部 查看完整缓存。"
+        )
+
+    @staticmethod
+    def natural_bet_candidates(team_text: str, matches: List[LotteryMatch]) -> str:
+        lines = [f"🔎 找到多场包含“{team_text}”的赛事，请指定场次", "━━━━━━━━━━━━"]
+        for match in matches[:8]:
+            lines.append(f"🔢 {match.match_num or match.match_id}｜{match.home_team} vs {match.away_team}｜{match.match_time}")
+        lines.append("💡 示例：/足球投注 周五003 主胜 1000")
+        return "\n".join(lines)
 
     @staticmethod
     def status(fetch_state: Dict[str, Any], cached_count: int, pending_count: int) -> str:
