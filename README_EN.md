@@ -36,7 +36,7 @@ Plugin configuration is defined in `_conf_schema.json`. Common options:
 
 | Key | Default | Description |
 | --- | ---: | --- |
-| `fetch_interval_minutes` | `60` | Lottery API fetch interval in minutes |
+| `fetch_interval_minutes` | `180` | Lottery API fetch interval in minutes; defaults to 3 hours to avoid excessive API access |
 | `settlement_interval_minutes` | `10` | Settlement scan interval in minutes |
 | `days_ahead` | `7` | Number of future days to cache |
 | `daily_checkin_amount` | `20000` | Daily check-in reward |

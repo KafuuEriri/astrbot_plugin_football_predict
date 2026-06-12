@@ -36,7 +36,7 @@ pip install -r requirements.txt
 
 | 配置 | 默认值 | 说明 |
 | --- | ---: | --- |
-| `fetch_interval_minutes` | `60` | 彩票接口抓取间隔，单位分钟 |
+| `fetch_interval_minutes` | `180` | 彩票接口抓取间隔，单位分钟；默认 3 小时，避免频繁访问接口 |
 | `settlement_interval_minutes` | `10` | 结算扫描间隔，单位分钟 |
 | `days_ahead` | `7` | 缓存未来多少天赛事 |
 | `daily_checkin_amount` | `20000` | 每日签到金额 |

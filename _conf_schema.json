@@ -1,8 +1,8 @@
 {
   "fetch_interval_minutes": {
-    "description": "体彩接口抓取间隔（分钟），普通命令只读取本地缓存",
+    "description": "体彩接口抓取间隔（分钟），普通命令只读取本地缓存；默认3小时，避免频繁访问接口",
     "type": "int",
-    "default": 60
+    "default": 180
   },
   "settlement_interval_minutes": {
     "description": "投注结算扫描间隔（分钟）",

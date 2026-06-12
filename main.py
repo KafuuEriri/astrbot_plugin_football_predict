@@ -49,7 +49,7 @@ class FootballPredictPlugin(Star):
     async def initialize(self):
         if self._config_bool("auto_fetch_on_start", True):
             self._tasks.append(asyncio.create_task(self._safe_fetch_once()))
-        fetch_interval = self._config_int("fetch_interval_minutes", 60)
+        fetch_interval = self._config_int("fetch_interval_minutes", 180)
         settlement_interval = self._config_int("settlement_interval_minutes", 10)
         if fetch_interval > 0:
             self._tasks.append(asyncio.create_task(self._fetch_loop(fetch_interval)))
