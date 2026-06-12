@@ -1,0 +1,44 @@
+import unittest
+from decimal import Decimal
+
+from services.betting_engine import BettingEngine
+from services.settlement_service import SettlementService
+from tests.helpers import FakeEvent, TempStorageMixin, sample_match
+
+
+class SettlementServiceTest(TempStorageMixin, unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+        self.engine = BettingEngine(self.storage, {"daily_checkin_amount": 20000})
+        self.settlement = SettlementService(self.storage)
+        self.event = FakeEvent(sender_id="u1", session_id="g1")
+        self.engine.checkin(self.event, date="2026-06-12", timestamp=1)
+        self.storage.write_matches([sample_match()])
+
+    def test_manual_result_settles_wins_losses_and_is_idempotent(self):
+        match = self.storage.find_match("周五001")
+        win_bet = self.engine.place_bet(self.event, match, "主胜", "1000", timestamp=2)
+        lose_bet = self.engine.place_bet(self.event, match, "客胜", "1000", timestamp=3)
+        self.settlement.record_manual_result("周五001", "主胜", score="2-1", timestamp=4)
+        summary = self.settlement.settle_pending(timestamp=5)
+        self.assertEqual(summary["won"], 1)
+        self.assertEqual(summary["lost"], 1)
+        self.assertEqual(self.storage.get_bet(win_bet.bet_id).status, "won")
+        self.assertEqual(self.storage.get_bet(lose_bet.bet_id).status, "lost")
+        self.assertEqual(self.storage.get_user(win_bet.user_id).balance, Decimal("20000.00"))
+        second_summary = self.settlement.settle_pending(timestamp=6)
+        self.assertEqual(second_summary["settled"], 0)
+        self.assertEqual(self.storage.get_user(win_bet.user_id).balance, Decimal("20000.00"))
+
+    def test_void_result_refunds_stake(self):
+        match = self.storage.find_match("周五001")
+        bet = self.engine.place_bet(self.event, match, "主胜", "1000", timestamp=2)
+        self.settlement.record_manual_result("周五001", "无效", timestamp=3)
+        summary = self.settlement.settle_pending(timestamp=4)
+        self.assertEqual(summary["void"], 1)
+        self.assertEqual(self.storage.get_bet(bet.bet_id).status, "void")
+        self.assertEqual(self.storage.get_user(bet.user_id).balance, Decimal("20000.00"))
+
+
+if __name__ == "__main__":
+    unittest.main()

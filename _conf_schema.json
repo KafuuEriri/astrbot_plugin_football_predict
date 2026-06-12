@@ -1,0 +1,57 @@
+{
+  "fetch_interval_minutes": {
+    "description": "体彩接口抓取间隔（分钟），普通命令只读取本地缓存",
+    "type": "int",
+    "default": 60
+  },
+  "settlement_interval_minutes": {
+    "description": "投注结算扫描间隔（分钟）",
+    "type": "int",
+    "default": 10
+  },
+  "days_ahead": {
+    "description": "缓存未来多少天赛事",
+    "type": "int",
+    "default": 7
+  },
+  "daily_checkin_amount": {
+    "description": "每日签到获得的虚拟金额",
+    "type": "int",
+    "default": 20000
+  },
+  "initial_balance": {
+    "description": "新账户初始余额",
+    "type": "int",
+    "default": 0
+  },
+  "min_bet_amount": {
+    "description": "单笔最小投注金额",
+    "type": "int",
+    "default": 100
+  },
+  "max_bet_amount": {
+    "description": "单笔最大投注金额",
+    "type": "int",
+    "default": 100000
+  },
+  "bet_close_minutes_before_match": {
+    "description": "开赛前多少分钟停止投注和撤单",
+    "type": "int",
+    "default": 5
+  },
+  "competition_keywords": {
+    "description": "赛事过滤关键词，逗号分隔",
+    "type": "string",
+    "default": "世界杯,World Cup"
+  },
+  "auto_fetch_on_start": {
+    "description": "插件启动时是否自动刷新一次体彩缓存",
+    "type": "bool",
+    "default": true
+  },
+  "announce_settlements": {
+    "description": "是否自动播报结算结果",
+    "type": "bool",
+    "default": false
+  }
+}

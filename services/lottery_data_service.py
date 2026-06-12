@@ -1,0 +1,115 @@
+import asyncio
+from decimal import Decimal
+from typing import Any, Dict, Iterable, List, Optional
+
+try:
+    from china_lottery_spider import ChinaLotterySpider
+    from models import LotteryMatch
+    from utils.time_utils import now_ts, parse_match_datetime, sale_close_ts
+    from utils.storage import DataStorage
+except ImportError:
+    from ..china_lottery_spider import ChinaLotterySpider
+    from ..models import LotteryMatch
+    from ..utils.time_utils import now_ts, parse_match_datetime, sale_close_ts
+    from ..utils.storage import DataStorage
+
+
+class LotteryDataService:
+    def __init__(self, storage: DataStorage, config: Optional[Dict[str, Any]] = None, spider=None, logger=None):
+        self.storage = storage
+        self.config = config or {}
+        self.spider = spider or ChinaLotterySpider(logger_instance=logger)
+        self.logger = logger
+
+    async def fetch_and_cache(self) -> List[LotteryMatch]:
+        fetched_at = now_ts()
+        try:
+            raw_matches = await asyncio.to_thread(self.spider.get_formatted_matches, self._config_int("days_ahead", 7))
+            matches = self.normalize_matches(raw_matches, fetched_at)
+            self.storage.write_matches(matches)
+            self.storage.append_odds_history(matches)
+            self.storage.save_fetch_state({
+                "last_fetch_at": fetched_at,
+                "last_fetch_ok": True,
+                "last_error": "",
+                "last_match_count": len(matches),
+                "last_world_cup_match_count": sum(1 for match in matches if match.is_world_cup),
+                "last_had_count": sum(1 for match in matches if match.pool_type == "had"),
+                "last_hhad_count": sum(1 for match in matches if match.pool_type == "hhad"),
+            })
+            return matches
+        except Exception as exc:
+            self.storage.save_fetch_state({
+                "last_fetch_at": fetched_at,
+                "last_fetch_ok": False,
+                "last_error": str(exc),
+            })
+            raise
+
+    def normalize_matches(self, raw_matches: Iterable[Dict[str, Any]], fetched_at: Optional[int] = None) -> List[LotteryMatch]:
+        fetched_at = fetched_at or now_ts()
+        return [self.normalize_match(raw, fetched_at) for raw in raw_matches]
+
+    def normalize_match(self, raw: Dict[str, Any], fetched_at: int) -> LotteryMatch:
+        odds = raw.get("odds", {})
+        compatibility_odds = odds.get("hhad", {})
+        odds_h = odds.get("odds_h") or compatibility_odds.get("h") or "0"
+        odds_d = odds.get("odds_d") or compatibility_odds.get("d") or "0"
+        odds_a = odds.get("odds_a") or compatibility_odds.get("a") or "0"
+        match_time = str(raw.get("match_time", ""))
+        match_date = str(raw.get("match_date", ""))
+        time_part = match_time.replace(match_date, "", 1).strip() if match_date else match_time
+        kickoff_ts = parse_match_datetime(match_date, time_part) or parse_match_datetime(match_time)
+        close_ts = sale_close_ts(kickoff_ts, self._config_int("bet_close_minutes_before_match", 5))
+        pool_type = str(odds.get("pool_type") or odds.get("type") or "had").lower()
+        league_name = str(raw.get("league_name", ""))
+        return LotteryMatch(
+            match_id=str(raw.get("match_id", "")),
+            raw_match_id=str(raw.get("raw_match_id", "")),
+            match_num=str(raw.get("match_num", "")),
+            business_date=str(raw.get("business_date", "")),
+            league_name=league_name,
+            home_team=str(raw.get("home_team", "")),
+            away_team=str(raw.get("away_team", "")),
+            match_date=match_date,
+            match_time=match_time,
+            kickoff_ts=kickoff_ts,
+            sale_close_ts=close_ts,
+            status=str(raw.get("status", "")),
+            pool_type=pool_type,
+            goal_line=str(odds.get("goal_line", "")),
+            odds_h=Decimal(str(odds_h)),
+            odds_d=Decimal(str(odds_d)),
+            odds_a=Decimal(str(odds_a)),
+            odds_update_time=str(odds.get("update_time", "")),
+            home_score=str(raw.get("home_score", "")),
+            away_score=str(raw.get("away_score", "")),
+            result=str(raw.get("result", "")),
+            source=str(raw.get("source", "china_lottery")),
+            fetched_at=fetched_at,
+            is_world_cup=self.is_world_cup(league_name),
+        )
+
+    def get_cached_matches(self, world_cup_only: bool = False, open_only: bool = False, timestamp: Optional[int] = None) -> List[LotteryMatch]:
+        matches = self.storage.get_matches()
+        if world_cup_only:
+            matches = [match for match in matches if match.is_world_cup]
+        if open_only:
+            timestamp = timestamp or now_ts()
+            matches = [match for match in matches if match.is_open_for_betting(timestamp)]
+        return sorted(matches, key=lambda match: (match.kickoff_ts, match.match_num, match.match_id))
+
+    def find_match(self, key: str) -> Optional[LotteryMatch]:
+        return self.storage.find_match(key)
+
+    def is_world_cup(self, league_name: str) -> bool:
+        keywords = [item.strip() for item in str(self.config.get("competition_keywords", "世界杯,World Cup")).split(",") if item.strip()]
+        if not keywords:
+            return True
+        return any(keyword.lower() in league_name.lower() for keyword in keywords)
+
+    def _config_int(self, key: str, default: int) -> int:
+        try:
+            return int(self.config.get(key, default))
+        except (TypeError, ValueError):
+            return default

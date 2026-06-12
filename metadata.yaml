@@ -1,0 +1,5 @@
+name: astrbot_plugin_football_predict
+desc: 体彩足球世界杯虚拟投注插件，支持赛事缓存、每日签到、模拟投注和群内排行
+version: v0.1.0
+author: zhangsixian
+repo: ""
