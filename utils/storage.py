@@ -128,7 +128,10 @@ class DataStorage:
         with self._lock:
             rows = {self._match_key(row): row for row in self.read_csv("matches.csv")}
             for match in matches:
-                rows[(match.match_id, match.pool_type)] = match.to_dict()
+                key = (match.match_id, match.pool_type)
+                incoming = match.to_dict()
+                existing = rows.get(key)
+                rows[key] = self._merge_match_row(existing, incoming) if existing else incoming
             self._write_csv("matches.csv", MATCH_FIELDS, rows.values())
 
     def get_matches(self) -> List[LotteryMatch]:
@@ -271,6 +274,13 @@ class DataStorage:
 
     def _match_key(self, row: Dict[str, Any]) -> Tuple[str, str]:
         return str(row.get("match_id", "")), str(row.get("pool_type", ""))
+
+    def _merge_match_row(self, existing: Dict[str, Any], incoming: Dict[str, Any]) -> Dict[str, Any]:
+        merged = {**existing, **incoming}
+        for field in ("home_score", "away_score", "result", "status"):
+            if str(incoming.get(field, "")).strip() == "" and str(existing.get(field, "")).strip() != "":
+                merged[field] = existing[field]
+        return merged
 
     def _call_event(self, event, method: str, default: str) -> str:
         func = getattr(event, method, None)

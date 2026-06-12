@@ -14,7 +14,13 @@ class AdminHandlers:
         try:
             matches = await self.lottery_service.fetch_and_cache()
             world_cup_count = sum(1 for match in matches if match.is_world_cup)
-            yield event.plain_result(f"刷新完成：缓存 {len(matches)} 场，其中世界杯 {world_cup_count} 场。")
+            summary = self.settlement_service.settle_pending()
+            yield event.plain_result(
+                f"✅ 刷新完成\n"
+                f"📦 缓存赛事：{len(matches)} 场\n"
+                f"🏆 世界杯赛事：{world_cup_count} 场\n"
+                f"💰 自动结算：{summary.get('settled', 0)} 单"
+            )
         except Exception as exc:
             yield event.plain_result(f"刷新失败：{exc}")
 

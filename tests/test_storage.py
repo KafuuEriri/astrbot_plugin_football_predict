@@ -20,6 +20,37 @@ class StorageTest(TempStorageMixin, unittest.TestCase):
         self.storage.write_matches([second])
         self.assertEqual(len(self.storage.get_matches()), 2)
 
+    def test_preserves_existing_result_when_refresh_has_blank_result(self):
+        finished = sample_match(match_id="lottery_1", match_num="周五001")
+        finished.home_score = "2"
+        finished.away_score = "1"
+        finished.result = "H"
+        finished.status = "Finished"
+        refreshed = sample_match(match_id="lottery_1", match_num="周五001")
+        self.storage.write_matches([finished])
+        self.storage.write_matches([refreshed])
+        found = self.storage.find_match("周五001")
+        self.assertEqual(found.home_score, "2")
+        self.assertEqual(found.away_score, "1")
+        self.assertEqual(found.result, "H")
+        self.assertEqual(found.status, "Finished")
+
+    def test_updates_existing_result_when_refresh_has_new_result(self):
+        old = sample_match(match_id="lottery_1", match_num="周五001")
+        old.home_score = "2"
+        old.away_score = "1"
+        old.result = "H"
+        new = sample_match(match_id="lottery_1", match_num="周五001")
+        new.home_score = "1"
+        new.away_score = "1"
+        new.result = "D"
+        self.storage.write_matches([old])
+        self.storage.write_matches([new])
+        found = self.storage.find_match("周五001")
+        self.assertEqual(found.home_score, "1")
+        self.assertEqual(found.away_score, "1")
+        self.assertEqual(found.result, "D")
+
     def test_user_bet_and_history_storage(self):
         user = UserAccount(user_id="test:u1:g1", session_id="g1", balance=Decimal("1000"))
         self.storage.save_user(user)

@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -24,7 +25,11 @@ class LotteryDataService:
     async def fetch_and_cache(self) -> List[LotteryMatch]:
         fetched_at = now_ts()
         try:
-            raw_matches = await asyncio.to_thread(self.spider.get_formatted_matches, self._config_int("days_ahead", 7))
+            raw_matches = await asyncio.to_thread(
+                self._get_formatted_matches,
+                self._config_int("days_ahead", 7),
+                self._config_int("result_lookback_days", 2),
+            )
             matches = self.normalize_matches(raw_matches, fetched_at)
             self.storage.write_matches(matches)
             self.storage.append_odds_history(matches)
@@ -45,6 +50,15 @@ class LotteryDataService:
                 "last_error": str(exc),
             })
             raise
+
+    def _get_formatted_matches(self, days_ahead: int, result_lookback_days: int):
+        parameters = inspect.signature(self.spider.get_formatted_matches).parameters
+        supports_lookback = len(parameters) >= 2 or any(
+            parameter.kind == inspect.Parameter.VAR_POSITIONAL for parameter in parameters.values()
+        )
+        if supports_lookback:
+            return self.spider.get_formatted_matches(days_ahead, result_lookback_days)
+        return self.spider.get_formatted_matches(days_ahead)
 
     def normalize_matches(self, raw_matches: Iterable[Dict[str, Any]], fetched_at: Optional[int] = None) -> List[LotteryMatch]:
         fetched_at = fetched_at or now_ts()

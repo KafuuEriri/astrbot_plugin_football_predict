@@ -70,6 +70,20 @@ class FootballPredictPlugin(Star):
             await self.lottery_service.fetch_and_cache()
         except Exception as exc:
             logger.warning(f"体彩缓存刷新失败: {exc}")
+            return
+        await self._safe_settle_once()
+
+    async def _safe_settle_once(self):
+        try:
+            summary = self.settlement_service.settle_pending()
+            if summary.get("settled", 0):
+                logger.info(
+                    "足球投注自动结算完成: 扫描%s单，结算%s单",
+                    summary.get("scanned", 0),
+                    summary.get("settled", 0),
+                )
+        except Exception as exc:
+            logger.warning(f"足球投注结算失败: {exc}")
 
     async def _fetch_loop(self, interval_minutes: int):
         while True:
@@ -79,10 +93,7 @@ class FootballPredictPlugin(Star):
     async def _settlement_loop(self, interval_minutes: int):
         while True:
             await asyncio.sleep(max(60, interval_minutes * 60))
-            try:
-                self.settlement_service.settle_pending()
-            except Exception as exc:
-                logger.warning(f"足球投注结算失败: {exc}")
+            await self._safe_settle_once()
 
     def _config_int(self, key: str, default: int) -> int:
         try:

@@ -9,7 +9,10 @@ import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +40,13 @@ class ChinaLotterySpider:
             "Referer": "https://www.lottery.gov.cn/",
             "Origin": "https://www.lottery.gov.cn",
         }
-        self.session = requests.Session()
-        self.session.headers.update(self.headers)
+        self.session = requests.Session() if requests is not None else None
+        if self.session is not None:
+            self.session.headers.update(self.headers)
 
     def fetch_lottery_data(self, pool_code: str = "hhad", channel: str = "c") -> Optional[Dict[str, Any]]:
+        if requests is None or self.session is None:
+            raise Exception("缺少 requests 依赖，请先安装 requirements.txt")
         url = f"{self.base_url}{self.api_endpoint}"
         params = {"poolCode": pool_code, "channel": channel}
 
@@ -155,11 +161,17 @@ class ChinaLotterySpider:
 
         return True
 
-    def filter_matches_by_date(self, matches: List[Dict[str, Any]], days_ahead: int = 3) -> List[Dict[str, Any]]:
+    def filter_matches_by_date(
+        self,
+        matches: List[Dict[str, Any]],
+        days_ahead: int = 3,
+        lookback_days: int = 0,
+    ) -> List[Dict[str, Any]]:
         if not matches:
             return []
 
         current_date = datetime.now().date()
+        start_date = current_date - timedelta(days=max(0, lookback_days))
         end_date = current_date + timedelta(days=days_ahead)
         filtered_matches = []
 
@@ -172,13 +184,13 @@ class ChinaLotterySpider:
             except ValueError:
                 self.logger.warning("日期格式错误: %s", match_date_str)
                 continue
-            if current_date <= match_date <= end_date:
+            if start_date <= match_date <= end_date:
                 filtered_matches.append(match)
 
         self.logger.info("日期过滤: %s -> %s 场比赛", len(matches), len(filtered_matches))
         return filtered_matches
 
-    def get_formatted_matches(self, days_ahead: int = 3) -> List[Dict[str, Any]]:
+    def get_formatted_matches(self, days_ahead: int = 3, result_lookback_days: int = 0) -> List[Dict[str, Any]]:
         had_data = None
         hhad_data = None
 
@@ -200,9 +212,9 @@ class ChinaLotterySpider:
         else:
             matches = self.parse_match_data(had_data or {})
 
-        filtered_matches = self.filter_matches_by_date(matches, days_ahead)
+        filtered_matches = self.filter_matches_by_date(matches, days_ahead, result_lookback_days)
         if not filtered_matches:
-            raise Exception(f"未来{days_ahead}天内没有可用的比赛")
+            raise Exception(f"近{result_lookback_days}天到未来{days_ahead}天内没有可用的比赛")
 
         had_count = sum(1 for match in filtered_matches if match.get("odds", {}).get("pool_type") == "had")
         hhad_count = sum(1 for match in filtered_matches if match.get("odds", {}).get("pool_type") == "hhad")

@@ -39,6 +39,39 @@ class SettlementServiceTest(TempStorageMixin, unittest.TestCase):
         self.assertEqual(self.storage.get_bet(bet.bet_id).status, "void")
         self.assertEqual(self.storage.get_user(bet.user_id).balance, Decimal("20000.00"))
 
+    def test_cached_score_auto_settles_pending_bet(self):
+        match = self.storage.find_match("周五001")
+        bet = self.engine.place_bet(self.event, match, "主胜", "1000", timestamp=2)
+        match.home_score = "2"
+        match.away_score = "1"
+        match.status = "Finished"
+        self.storage.write_matches([match])
+        summary = self.settlement.settle_pending(timestamp=3)
+        settled_bet = self.storage.get_bet(bet.bet_id)
+        self.assertEqual(summary["won"], 1)
+        self.assertEqual(settled_bet.status, "won")
+        self.assertEqual(settled_bet.result, "H")
+        self.assertEqual(self.storage.get_user(bet.user_id).balance, Decimal("21000.00"))
+
+    def test_hhad_settlement_uses_bet_goal_line_with_fallback_score(self):
+        hhad_match = sample_match(match_id="lottery_3", match_num="周五003")
+        hhad_match.pool_type = "hhad"
+        hhad_match.goal_line = "-1"
+        self.storage.write_matches([hhad_match])
+        bet = self.engine.place_bet(self.event, hhad_match, "平", "1000", timestamp=2)
+        had_score = sample_match(match_id="lottery_3", match_num="周五003")
+        had_score.home_score = "2"
+        had_score.away_score = "1"
+        had_score.result = "H"
+        had_score.status = "Finished"
+        self.storage.write_matches([had_score])
+        summary = self.settlement.settle_pending(timestamp=3)
+        settled_bet = self.storage.get_bet(bet.bet_id)
+        self.assertEqual(summary["won"], 1)
+        self.assertEqual(settled_bet.status, "won")
+        self.assertEqual(settled_bet.result, "D")
+        self.assertEqual(self.storage.get_user(bet.user_id).balance, Decimal("22000.00"))
+
 
 if __name__ == "__main__":
     unittest.main()

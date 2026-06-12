@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timedelta
 
 from china_lottery_spider import ChinaLotterySpider
 
@@ -36,6 +37,16 @@ class SpiderParserTest(unittest.TestCase):
         odds = ChinaLotterySpider().extract_odds(match_data)
         self.assertEqual(odds["pool_type"], "hhad")
         self.assertEqual(odds["goal_line"], "-1")
+
+    def test_filter_matches_keeps_recent_finished_matches(self):
+        today = datetime.now().date()
+        matches = [
+            {"match_id": "recent", "match_date": str(today - timedelta(days=1))},
+            {"match_id": "old", "match_date": str(today - timedelta(days=3))},
+            {"match_id": "future", "match_date": str(today + timedelta(days=1))},
+        ]
+        filtered = ChinaLotterySpider().filter_matches_by_date(matches, days_ahead=1, lookback_days=2)
+        self.assertEqual([match["match_id"] for match in filtered], ["recent", "future"])
 
 
 if __name__ == "__main__":

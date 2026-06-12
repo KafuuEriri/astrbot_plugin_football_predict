@@ -1,5 +1,5 @@
-from decimal import Decimal
-from typing import Any, Dict, Optional
+from decimal import Decimal, InvalidOperation
+from typing import Any, Dict, List, Optional
 
 try:
     from models import BetOrder, LotteryMatch
@@ -96,10 +96,56 @@ class SettlementService:
         manual = manual_results.get(bet.match_id) or manual_results.get(bet.match_num)
         if manual:
             return manual.get("result", "")
-        match = self.storage.find_match(bet.match_id)
-        if not match:
+        for match in self._matches_for_bet(bet):
+            result = self._compute_result_for_bet(bet, match)
+            if result:
+                return result
+        return ""
+
+    def _matches_for_bet(self, bet: BetOrder) -> List[LotteryMatch]:
+        exact = []
+        same_match = []
+        same_num = []
+        seen = set()
+        for match in self.storage.get_matches():
+            key = (match.match_id, match.pool_type)
+            if key in seen:
+                continue
+            seen.add(key)
+            if match.match_id == bet.match_id and match.pool_type == bet.pool_type:
+                exact.append(match)
+            elif match.match_id == bet.match_id or match.raw_match_id == bet.match_id:
+                same_match.append(match)
+            elif bet.match_num and match.match_num == bet.match_num:
+                same_num.append(match)
+        return exact + same_match + same_num
+
+    def _compute_result_for_bet(self, bet: BetOrder, match: LotteryMatch) -> str:
+        normalized = self._normalize_result(match.result)
+        if normalized and (normalized == "VOID" or match.pool_type == bet.pool_type):
+            return normalized
+        if match.home_score == "" or match.away_score == "":
             return ""
-        return match.compute_result()
+        try:
+            home = Decimal(str(match.home_score))
+            away = Decimal(str(match.away_score))
+            goal_line = bet.goal_line if bet.goal_line != "" else match.goal_line
+            if str(bet.pool_type).lower() == "hhad" and goal_line != "":
+                home += Decimal(str(goal_line))
+        except (InvalidOperation, ValueError):
+            return ""
+        if home > away:
+            return "H"
+        if home == away:
+            return "D"
+        return "A"
+
+    def _normalize_result(self, result: str) -> str:
+        text = str(result).strip().upper()
+        if text in ("H", "D", "A", "VOID"):
+            return text
+        mapping = {"主胜": "H", "胜": "H", "平": "D", "平局": "D", "客胜": "A", "负": "A", "无效": "VOID"}
+        return mapping.get(text, "")
 
     def _manual_result_map(self) -> Dict[str, Dict[str, str]]:
         results = {}
