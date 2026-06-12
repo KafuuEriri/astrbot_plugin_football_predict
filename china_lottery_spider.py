@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""中国体育彩票足球胜平负爬虫。"""
+"""足球胜平负爬虫。"""
 
 import json
 import logging
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class ChinaLotterySpider:
-    """中国体育彩票足球胜平负数据获取器。"""
+    """足球胜平负数据获取器。"""
 
     def __init__(
         self,
@@ -302,7 +302,7 @@ def main():
     spider = ChinaLotterySpider()
 
     try:
-        print("测试中国体育彩票爬虫...")
+        print("测试爬虫...")
         matches = spider.get_formatted_matches(days_ahead=7)
         print(f"\n成功获取 {len(matches)} 场比赛")
 
